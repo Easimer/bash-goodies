@@ -7,12 +7,22 @@ function print_usage_exit {
 	exit 1
 }
 
+function random {
+	GEN=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+	MATCH=`echo "$GEN" | grep '[0-9]' | grep '[a-z]' | grep '[A-Z]'`
+	while [[ "$MATCH" != "$GEN" ]] ; do
+		GEN=`random`
+		MATCH=`echo "$GEN" | grep '[0-9]' | grep '[a-z]' | grep '[A-Z]'`
+	done
+	echo "$GEN"
+}
+
 if [ "`whoami`" != "root" ]; then # ellenőrzi root-ként fut-e. ha nem, kilépteti a programot.
 	echo "You must be root to add new users!"
 	exit 1
 fi
 
-if [[ $# -ne 1 ]]; then # van-e legalább egy argumentum
+if [[ $# -lt 1 ]]; then # van-e legalább egy argumentum
 	print_usage_exit $0
 fi
 
@@ -38,24 +48,24 @@ fi
 while IFS=',' read ID PW NM; do # beolvassuk a vesszővel elválasztott ID-t, jelszót és nevet
 	if $SKIP; then # ha ki kell hagynunk egy sort
 		SKIP=false
+		echo "$ID,$PW,$NM" > "out"
 		continue # kihagyjuk
 	fi
 
 	if [[ "$PW" == "#" ]]; then # random generált jelszó
-		PW=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+		PW=`random`
 	fi
 
-	echo "$ID $PW $NM"
-	
+	echo "$ID,$PW,$NM" 
+	echo "$ID,$PW,$NM" > "out"
+
 	useradd --comment="$NM" -m "$ID" # felhasználó hozzáad
-	if [[ "$PW" != "*"]]; then
+	if [[ "$PW" != "*" ]]; then
 		echo "$ID:$PW" | chpasswd # jelszó megváltoztat
-		(echo $PW; echo $PW) | smbpasswd -e $ID -s # samba jelszó megváltoztat
+		(echo $PW; echo $PW) | smbpasswd -a $ID -s # samba jelszó megváltoztat
 	else
-		smbpasswd -e $ID -n # samba felhasználó hozzáad, jelszó nélkül
+		smbpasswd -a $ID -n # samba felhasználó hozzáad, jelszó nélkül
 	fi
 	pdbedit -f "$NM" -u $ID # teljes név megváltoztat
 
 done < $INFILE
-
-exit 0
