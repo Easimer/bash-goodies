@@ -40,14 +40,20 @@ while IFS=',' read ID PW NM; do # beolvassuk a vesszővel elválasztott ID-t, je
 		SKIP=false
 		continue # kihagyjuk
 	fi
-	#ID=`echo "$l" | awk -F ',' '{print $1}' -`
-	#PW=`echo "$l" | awk -F ',' '{print $2}' -`
-	#NM=`echo "$l" | awk -F ',' '{print $3}' -`
+
+	if [[ "$PW" == "#" ]]; then # random generált jelszó
+		PW=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 8 | head -n 1)
+	fi
+
 	echo "$ID $PW $NM"
 	
 	useradd --comment="$NM" -m "$ID" # felhasználó hozzáad
-	echo "$ID:$PW" | chpasswd # jelszó megváltoztat
-	(echo $PW; echo $PW) | smbpasswd -e $ID -s # samba jelszó megváltoztat
+	if [[ "$PW" != "*"]]; then
+		echo "$ID:$PW" | chpasswd # jelszó megváltoztat
+		(echo $PW; echo $PW) | smbpasswd -e $ID -s # samba jelszó megváltoztat
+	else
+		smbpasswd -e $ID -n # samba felhasználó hozzáad, jelszó nélkül
+	fi
 	pdbedit -f "$NM" -u $ID # teljes név megváltoztat
 
 done < $INFILE
